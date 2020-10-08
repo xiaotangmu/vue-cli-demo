@@ -1,113 +1,74 @@
 <template>
-  <div class="hello">
-    <h1>{{ msg }}</h1>
-    <h2>Essential Links</h2>
-    <ul>
-      <li>
-        <a
-          href="https://vuejs.org"
-          target="_blank"
-        >
-          Core Docs
-        </a>
-      </li>
-      <li>
-        <a
-          href="https://forum.vuejs.org"
-          target="_blank"
-        >
-          Forum
-        </a>
-      </li>
-      <li>
-        <a
-          href="https://chat.vuejs.org"
-          target="_blank"
-        >
-          Community Chat
-        </a>
-      </li>
-      <li>
-        <a
-          href="https://twitter.com/vuejs"
-          target="_blank"
-        >
-          Twitter
-        </a>
-      </li>
-      <br>
-      <li>
-        <a
-          href="http://vuejs-templates.github.io/webpack/"
-          target="_blank"
-        >
-          Docs for This Template
-        </a>
-      </li>
-    </ul>
-    <h2>Ecosystem</h2>
-    <ul>
-      <li>
-        <a
-          href="http://router.vuejs.org/"
-          target="_blank"
-        >
-          vue-router
-        </a>
-      </li>
-      <li>
-        <a
-          href="http://vuex.vuejs.org/"
-          target="_blank"
-        >
-          vuex
-        </a>
-      </li>
-      <li>
-        <a
-          href="http://vue-loader.vuejs.org/"
-          target="_blank"
-        >
-          vue-loader
-        </a>
-      </li>
-      <li>
-        <a
-          href="https://github.com/vuejs/awesome-vue"
-          target="_blank"
-        >
-          awesome-vue
-        </a>
-      </li>
-    </ul>
+  <div class="home">
+    <h1>前端演示SignalR</h1>
+    <input v-model="user" type="text" />
+    <input v-model="message" type="text" />
+    <button @click="sendAll">发送全部</button>
+    <button @click="sendOwn">对自己发送</button>
+    <div>
+      <ul v-for="(item ,index) in messages" v-bind:key="index +'itemMessage'">
+        <li>{{item.user}} says {{item.message}}</li>
+      </ul>
+    </div>
   </div>
 </template>
 
 <script>
-export default {
-  name: 'HelloWorld',
-  data () {
-    return {
-      msg: 'Welcome to Your Vue.js App'
-    }
-  }
-}
-</script>
+  // @ is an alias to /src
+  import HelloWorld from "@/components/HelloWorld.vue";
+  import * as signalR from "@aspnet/signalr";
+  export default {
+    name: "Home",
+    components: {
+      HelloWorld
+    },
+    data() {
+      return {
+        user: "", //用户
+        message: "", //消息
+        connection: "", //signalr连接
+        messages: [] //返回消息
+      };
+    },
+    methods: {
+      //给全部发送消息
+      sendAll: function() {
+        this.connection
+          .invoke("SendMessage", this.user, this.message)
+          .catch(function(err) {
+            return console.error(err);
+          });
+      },
+      //只给自己发送消息
+      sendOwn: function() {
+        this.connection
+          .invoke("SendMessageCaller", this.message)
+          .catch(function(err) {
+            return console.error(err);
+          });
+      }
 
-<!-- Add "scoped" attribute to limit CSS to this component only -->
-<style scoped>
-h1, h2 {
-  font-weight: normal;
-}
-ul {
-  list-style-type: none;
-  padding: 0;
-}
-li {
-  display: inline-block;
-  margin: 0 10px;
-}
-a {
-  color: #42b983;
-}
-</style>
+
+    },
+    created: function() {
+      let thisVue = this;
+      this.connection = new signalR.HubConnectionBuilder()
+        .withUrl("https://localhost:5001/chathub", {
+          skipNegotiation: true,
+          transport: signalR.HttpTransportType.WebSockets
+        })
+        .configureLogging(signalR.LogLevel.Information)
+        .build();
+      this.connection.on("ReceiveMessage", function(user, message) {
+        thisVue.messages.push({ user, message });
+        console.log({ user, message });
+      });
+      this.connection.on("ReceiveCaller", function(message) {
+        let user = "自己";//这里为了push不报错，我就弄了一个默认值。
+        thisVue.messages.push({ user, message });
+        console.log({ user, message });
+      });
+      this.connection.start();
+    }
+  };
+</script>
